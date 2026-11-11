@@ -1,0 +1,809 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام الموظفين - الإدارة والوكلاء</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Cairo', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <div id="app" class="flex-1 flex flex-col">
+        <!-- شاشة تسجيل الدخول -->
+        <div id="login-screen" class="flex-1 flex items-center justify-center p-4 bg-gradient-to-br from-indigo-900 via-slate-900 to-slate-950">
+            <div class="bg-white/15 backdrop-blur-xl border border-white/20 p-8 rounded-3xl shadow-2xl w-full max-w-md text-white">
+                <div class="text-center mb-8">
+                    <div class="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 rounded-2xl shadow-lg mb-4 text-2xl font-bold">
+                        <i class="fa-solid fa-users-gear"></i>
+                    </div>
+                    <h1 class="text-3xl font-extrabold tracking-tight">نظام الموظفين</h1>
+                    <p class="text-slate-300 text-sm mt-2">تسجيل الدخول إلى النظام</p>
+                </div>
+
+                <form id="login-form" onsubmit="handleLogin(event)" class="space-y-5">
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-slate-200">اسم المستخدم أو البريد</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400">
+                                <i class="fa-solid fa-user"></i>
+                            </span>
+                            <input type="text" id="login-username" required class="w-full pr-10 pl-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white placeholder-slate-400 text-sm" placeholder="أدخل اسم المستخدم">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-slate-200">كلمة المرور</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400">
+                                <i class="fa-solid fa-lock"></i>
+                            </span>
+                            <input type="password" id="login-password" required class="w-full pr-10 pl-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white placeholder-slate-400 text-sm" placeholder="••••••••">
+                        </div>
+                    </div>
+
+                    <div class="pt-2">
+                        <button type="submit" class="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold rounded-xl shadow-lg transition-all transform active:scale-95">
+                            تسجيل الدخول
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- لوحة التحكم العامة -->
+        <div id="dashboard-screen" class="hidden flex-1 flex flex-col">
+            <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+                <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+                    <div class="flex items-center space-x-4 space-x-reverse">
+                        <div class="bg-indigo-600 text-white p-2.5 rounded-xl shadow">
+                            <i class="fa-solid fa-network-wired"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-bold text-slate-800 text-lg" id="nav-system-title">نظام الموظفين</h2>
+                            <p class="text-xs text-slate-500" id="nav-agency-subtitle">إدارة شاملة ومتكاملة</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4 space-x-reverse">
+                        <div class="text-left hidden sm:block">
+                            <div class="text-sm font-bold text-slate-700" id="current-user-name">اسم المستخدم</div>
+                            <div class="text-xs text-indigo-600 font-medium" id="current-user-role">الرتبة</div>
+                        </div>
+                        <button onclick="logout()" class="bg-rose-50 hover:bg-rose-100 text-rose-600 px-4 py-2 rounded-xl text-sm font-bold transition flex items-center space-x-2 space-x-reverse">
+                            <i class="fa-solid fa-right-from-bracket"></i>
+                            <span>خروج</span>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6" id="main-content-area">
+            </main>
+        </div>
+    </div>
+
+    <script>
+        let db = JSON.parse(localStorage.getItem('employee_system_db')) || {
+            users: [
+                { id: 'admin_1', name: 'المدير حسين', username: 'hussein@sad1', password: 'sad1981sad00', role: 'admin', phone: '07700236696' }
+            ],
+            agencies: [],
+            employees: [],
+            tasks: [],
+            attendance: [],
+            settings: {}
+        };
+
+        function saveDb() {
+            localStorage.setItem('employee_system_db', JSON.stringify(db));
+        }
+
+        let currentUser = JSON.parse(localStorage.getItem('current_user')) || null;
+
+        window.onload = function() {
+            if (currentUser) {
+                showDashboard();
+            }
+        };
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const u = document.getElementById('login-username').value.trim();
+            const p = document.getElementById('login-password').value.trim();
+
+            if (u === 'hussein@sad1' && p === 'sad1981sad00') {
+                currentUser = { id: 'admin_1', name: 'المدير حسين', username: u, role: 'admin' };
+                localStorage.setItem('current_user', JSON.stringify(currentUser));
+                showDashboard();
+                return;
+            }
+
+            const agency = db.agencies.find(a => (a.username === u || a.phone === u) && a.password === p);
+            if (agency) {
+                if (new Date(agency.expiryDate) < new Date()) {
+                    Swal.fire('خطأ', 'حساب الوكيل منتهي الصلاحية من قبل المدير!', 'error');
+                    return;
+                }
+                currentUser = { id: agency.id, name: agency.name, username: agency.username, role: 'agency', phone: agency.phone };
+                localStorage.setItem('current_user', JSON.stringify(currentUser));
+                showDashboard();
+                return;
+            }
+
+            const emp = db.employees.find(e => e.username === u && e.password === p);
+            if (emp) {
+                const ag = db.agencies.find(a => a.id === emp.agencyId);
+                if (ag && new Date(ag.expiryDate) < new Date()) {
+                    Swal.fire('خطأ', 'حساب الوكيل التابع له الموظف منتهي الصلاحية!', 'error');
+                    return;
+                }
+                emp.lastDevice = navigator.userAgent;
+                saveDb();
+
+                currentUser = { id: emp.id, name: emp.name, username: emp.username, role: 'employee', agencyId: emp.agencyId };
+                localStorage.setItem('current_user', JSON.stringify(currentUser));
+                showDashboard();
+                return;
+            }
+
+            Swal.fire('خطأ', 'اسم المستخدم أو كلمة المرور غير صحيحة!', 'error');
+        }
+
+        function logout() {
+            localStorage.removeItem('current_user');
+            currentUser = null;
+            document.getElementById('login-screen').classList.remove('hidden');
+            document.getElementById('dashboard-screen').classList.add('hidden');
+        }
+
+        function showDashboard() {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('dashboard-screen').classList.remove('hidden');
+            document.getElementById('current-user-name').innerText = currentUser.name;
+
+            if (currentUser.role === 'admin') {
+                document.getElementById('current-user-role').innerText = 'مدير النظام العام';
+                document.getElementById('nav-system-title').innerText = 'نظام الموظفين - لوحة المدير';
+                document.getElementById('nav-agency-subtitle').innerText = 'الدعم الفني: 07700236696';
+                renderAdminDashboard();
+            } else if (currentUser.role === 'agency') {
+                document.getElementById('current-user-role').innerText = 'وكيل معتمد';
+                document.getElementById('nav-system-title').innerText = `مكتب: ${currentUser.name}`;
+                document.getElementById('nav-agency-subtitle').innerText = `هاتف: ${currentUser.phone}`;
+                renderAgencyDashboard();
+            } else if (currentUser.role === 'employee') {
+                document.getElementById('current-user-role').innerText = 'موظف ميداني';
+                document.getElementById('nav-system-title').innerText = 'بوابة الموظف';
+                document.getElementById('nav-agency-subtitle').innerText = 'بصمة الحضور واستلام المهام';
+                renderEmployeeDashboard();
+            }
+        }
+
+        function renderAdminDashboard() {
+            const container = document.getElementById('main-content-area');
+            container.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center space-x-4 space-x-reverse">
+                        <div class="p-4 bg-indigo-50 text-indigo-600 rounded-2xl text-2xl"><i class="fa-solid fa-store"></i></div>
+                        <div>
+                            <p class="text-slate-500 text-sm">إجمالي الوكلاء</p>
+                            <h3 class="text-2xl font-bold text-slate-800">${db.agencies.length}</h3>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center space-x-4 space-x-reverse">
+                        <div class="p-4 bg-emerald-50 text-emerald-600 rounded-2xl text-2xl"><i class="fa-solid fa-users"></i></div>
+                        <div>
+                            <p class="text-slate-500 text-sm">إجمالي الموظفين</p>
+                            <h3 class="text-2xl font-bold text-slate-800">${db.employees.length}</h3>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center space-x-4 space-x-reverse">
+                        <div class="p-4 bg-amber-50 text-amber-600 rounded-2xl text-2xl"><i class="fa-solid fa-headset"></i></div>
+                        <div>
+                            <p class="text-slate-500 text-sm">الدعم الفني</p>
+                            <h3 class="text-lg font-bold text-slate-800">07700236696</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
+                    <h3 class="text-xl font-bold text-slate-800 mb-4"><i class="fa-solid fa-user-plus text-indigo-600 ml-2"></i>إضافة وكيل جديد وتحديد صلاحية الانتهاء</h3>
+                    <form onsubmit="handleAddAgency(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-slate-700">اسم المكتب (الوكيل)</label>
+                            <input type="text" id="agency-name" required class="w-full p-3 border rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-slate-700">رقم الهاتف</label>
+                            <input type="text" id="agency-phone" required class="w-full p-3 border rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-slate-700">تاريخ انتهاء الحساب</label>
+                            <input type="date" id="agency-expiry" required class="w-full p-3 border rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-slate-700">اسم المستخدم</label>
+                            <input type="text" id="agency-user" required class="w-full p-3 border rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-slate-700">كلمة المرور</label>
+                            <input type="password" id="agency-pass" required class="w-full p-3 border rounded-xl text-sm">
+                        </div>
+                        <div class="flex items-end">
+                            <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow transition">حفظ وتفعيل الوكيل</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <h3 class="text-xl font-bold text-slate-800 mb-4">قائمة الوكلاء المشتركين وتواريخ الصلاحية</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-600 text-sm">
+                                    <th class="p-3 rounded-r-xl">اسم المكتب</th>
+                                    <th class="p-3">الهاتف</th>
+                                    <th class="p-3">اسم المستخدم</th>
+                                    <th class="p-3">تاريخ انتهاء الحساب</th>
+                                    <th class="p-3 rounded-l-xl">الإجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-sm">
+                                ${db.agencies.length === 0 ? `<tr><td colspan="5" class="text-center p-6 text-slate-400">لا يوجد وكلاء مسجلون حالياً</td></tr>` : 
+                                  db.agencies.map(a => `
+                                    <tr>
+                                        <td class="p-3 font-bold text-slate-800">${a.name}</td>
+                                        <td class="p-3">${a.phone}</td>
+                                        <td class="p-3 font-mono">${a.username}</td>
+                                        <td class="p-3"><span class="px-3 py-1 bg-slate-100 rounded-full text-xs font-semibold ${new Date(a.expiryDate) < new Date() ? 'text-rose-600 bg-rose-50' : 'text-emerald-600 bg-emerald-50'}">${a.expiryDate}</span></td>
+                                        <td class="p-3 flex space-x-2 space-x-reverse">
+                                            <button onclick="extendAgency('${a.id}')" class="bg-amber-50 hover:bg-amber-100 text-amber-600 px-3 py-1.5 rounded-lg text-xs font-bold">تمديد</button>
+                                            <button onclick="deleteAgency('${a.id}')" class="bg-rose-50 hover:bg-rose-100 text-rose-600 px-3 py-1.5 rounded-lg text-xs font-bold">حذف</button>
+                                        </td>
+                                    </tr>
+                                  `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function handleAddAgency(e) {
+            e.preventDefault();
+            const newAgency = {
+                id: 'agency_' + Date.now(),
+                name: document.getElementById('agency-name').value,
+                phone: document.getElementById('agency-phone').value,
+                expiryDate: document.getElementById('agency-expiry').value,
+                username: document.getElementById('agency-user').value,
+                password: document.getElementById('agency-pass').value
+            };
+            db.agencies.push(newAgency);
+            saveDb();
+            Swal.fire('نجاح', 'تمت إضافة وتفعيل الوكيل بنجاح', 'success');
+            renderAdminDashboard();
+        }
+
+        function extendAgency(id) {
+            Swal.fire({
+                title: 'تمديد صلاحية الوكيل',
+                input: 'date',
+                showCancelButton: true,
+                confirmButtonText: 'تحديث',
+                cancelButtonText: 'إلغاء'
+            }).then((result) => {
+                if (result.value) {
+                    const ag = db.agencies.find(a => a.id === id);
+                    if (ag) {
+                        ag.expiryDate = result.value;
+                        saveDb();
+                        Swal.fire('تم', 'تم تحديث تاريخ انتهاء الصلاحية', 'success');
+                        renderAdminDashboard();
+                    }
+                }
+            });
+        }
+
+        function deleteAgency(id) {
+            Swal.fire({
+                title: 'هل أنت متأكد؟',
+                text: 'سيتم حذف الوكيل وجميع بياناته!',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'نعم، حذف',
+                cancelButtonText: 'إلغاء'
+            }).then((res) => {
+                if (res.isConfirmed) {
+                    db.agencies = db.agencies.filter(a => a.id !== id);
+                    db.employees = db.employees.filter(e => e.agencyId !== id);
+                    saveDb();
+                    renderAdminDashboard();
+                }
+            });
+        }
+
+        let activeAgencyTab = 'employees';
+
+        function renderAgencyDashboard() {
+            const container = document.getElementById('main-content-area');
+            const agencyEmployees = db.employees.filter(e => e.agencyId === currentUser.id);
+            const agencyTasks = db.tasks.filter(t => t.agencyId === currentUser.id);
+            const agencyAttendance = db.attendance.filter(a => a.agencyId === currentUser.id);
+
+            container.innerHTML = `
+                <div class="flex space-x-2 space-x-reverse mb-6 border-b border-slate-200 pb-3 overflow-x-auto">
+                    <button onclick="switchAgencyTab('employees')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition ${activeAgencyTab === 'employees' ? 'bg-indigo-600 text-white shadow' : 'bg-white text-slate-600 hover:bg-slate-100'}"><i class="fa-solid fa-users ml-2"></i>إدارة الموظفين</button>
+                    <button onclick="switchAgencyTab('geofence')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition ${activeAgencyTab === 'geofence' ? 'bg-indigo-600 text-white shadow' : 'bg-white text-slate-600 hover:bg-slate-100'}"><i class="fa-solid fa-location-dot ml-2"></i>الإحداثيات والمسافة وبصمة الحضور</button>
+                    <button onclick="switchAgencyTab('tasks')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition ${activeAgencyTab === 'tasks' ? 'bg-indigo-600 text-white shadow' : 'bg-white text-slate-600 hover:bg-slate-100'}"><i class="fa-solid fa-list-check ml-2"></i>توزيع المهام والمتابعة</button>
+                    <button onclick="switchAgencyTab('salaries')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition ${activeAgencyTab === 'salaries' ? 'bg-indigo-600 text-white shadow' : 'bg-white text-slate-600 hover:bg-slate-100'}"><i class="fa-solid fa-calculator ml-2"></i>الرواتب والخصومات التلقائية</button>
+                    <button onclick="switchAgencyTab('reports')" class="px-5 py-2.5 rounded-xl font-bold text-sm transition ${activeAgencyTab === 'reports' ? 'bg-indigo-600 text-white shadow' : 'bg-white text-slate-600 hover:bg-slate-100'}"><i class="fa-solid fa-chart-line ml-2"></i>التقارير الشاملة</button>
+                </div>
+
+                <div id="agency-tab-content">
+                    ${activeAgencyTab === 'employees' ? renderAgencyEmployeesTab(agencyEmployees) : ''}
+                    ${activeAgencyTab === 'geofence' ? renderAgencyGeofenceTab(agencyEmployees) : ''}
+                    ${activeAgencyTab === 'tasks' ? renderAgencyTasksTab(agencyEmployees, agencyTasks) : ''}
+                    ${activeAgencyTab === 'salaries' ? renderAgencySalariesTab(agencyEmployees, agencyAttendance) : ''}
+                    ${activeAgencyTab === 'reports' ? renderAgencyReportsTab(agencyTasks, agencyAttendance, agencyEmployees) : ''}
+                </div>
+            `;
+        }
+
+        function switchAgencyTab(tab) {
+            activeAgencyTab = tab;
+            renderAgencyDashboard();
+        }
+
+        function renderAgencyEmployeesTab(employees) {
+            return `
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
+                    <h3 class="text-xl font-bold text-slate-800 mb-4"><i class="fa-solid fa-user-plus text-indigo-600 ml-2"></i>إضافة موظف جديد (صورة من المعرض، بيانات الدخول، وأوقات الدوام)</h3>
+                    <form onsubmit="handleAddEmployee(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-slate-700">اسم الموظف</label>
+                            <input type="text" id="emp-name" required class="w-full p-3 border rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-slate-700">رقم الهاتف</label>
+                            <input type="text" id="emp-phone" required class="w-full p-3 border rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-slate-700">اسم المستخدم (أو البريد)</label>
+                            <input type="text" id="emp-user" required class="w-full p-3 border rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-slate-700">كلمة المرور</label>
+                            <input type="password" id="emp-pass" required class="w-full p-3 border rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-slate-700">اختر صورة الموظف (من المعرض)</label>
+                            <input type="file" id="emp-img-file" accept="image/*" class="w-full p-2 border rounded-xl text-xs bg-slate-50">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-slate-700">وقت بدء الدوام</label>
+                            <input type="time" id="emp-start" value="08:00" required class="w-full p-3 border rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-slate-700">وقت نهاية الدوام</label>
+                            <input type="time" id="emp-end" value="16:00" required class="w-full p-3 border rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1 text-slate-700">الراتب الأساسي</label>
+                            <input type="number" id="emp-salary" value="500000" required class="w-full p-3 border rounded-xl text-sm">
+                        </div>
+                        <div class="col-span-full flex justify-end">
+                            <button type="submit" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow transition">حفظ الموظف</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <h3 class="text-xl font-bold text-slate-800 mb-4">قائمة موظفي المكتب ونوع الأجهزة المسجلة (للولكيل فقط)</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-600 text-sm">
+                                    <th class="p-3 rounded-r-xl">الموظف</th>
+                                    <th class="p-3">رقم الهاتف</th>
+                                    <th class="p-3">اسم المستخدم / البريد</th>
+                                    <th class="p-3">نوع الجهاز أو المتصفح المستخدم</th>
+                                    <th class="p-3">الدوام والراتب</th>
+                                    <th class="p-3 rounded-l-xl">إجراءات</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-sm">
+                                ${employees.length === 0 ? `<tr><td colspan="6" class="text-center p-6 text-slate-400">لا يوجد موظفين مسجلين</td></tr>` :
+                                  employees.map(e => `
+                                    <tr>
+                                        <td class="p-3 flex items-center space-x-3 space-x-reverse">
+                                            <img src="${e.img || 'https://via.placeholder.com/40'}" class="w-10 h-10 rounded-full object-cover border">
+                                            <div>
+                                                <span class="font-bold text-slate-800">${e.name}</span>
+                                            </div>
+                                        </td>
+                                        <td class="p-3">${e.phone}</td>
+                                        <td class="p-3 font-mono">${e.username}</td>
+                                        <td class="p-3 text-xs text-slate-600 max-w-xs truncate" title="${e.lastDevice || 'لم يسجل الدخول بعد'}">${e.lastDevice || 'لم يسجل الدخول بعد'}</td>
+                                        <td class="p-3">${e.workStart}-${e.workEnd} | ${e.salary} د.ع</td>
+                                        <td class="p-3">
+                                            <button onclick="deleteEmployee('${e.id}')" class="bg-rose-50 hover:bg-rose-100 text-rose-600 px-3 py-1.5 rounded-lg text-xs font-bold">حذف</button>
+                                        </td>
+                                    </tr>
+                                  `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function handleAddEmployee(e) {
+            e.preventDefault();
+            const fileInput = document.getElementById('emp-img-file');
+            
+            if (fileInput.files && fileInput.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    saveNewEmployeeData(event.target.result);
+                };
+                reader.readAsDataURL(fileInput.files[0]);
+            } else {
+                saveNewEmployeeData('https://via.placeholder.com/40');
+            }
+        }
+
+        function saveNewEmployeeData(imgBase64) {
+            const newEmp = {
+                id: 'emp_' + Date.now(),
+                agencyId: currentUser.id,
+                name: document.getElementById('emp-name').value,
+                phone: document.getElementById('emp-phone').value,
+                username: document.getElementById('emp-user').value,
+                password: document.getElementById('emp-pass').value,
+                img: imgBase64,
+                workStart: document.getElementById('emp-start').value,
+                workEnd: document.getElementById('emp-end').value,
+                salary: parseFloat(document.getElementById('emp-salary').value),
+                lat: 33.3152,
+                lng: 44.3661,
+                radius: 100,
+                lastDevice: 'لم يسجل الدخول بعد'
+            };
+            db.employees.push(newEmp);
+            saveDb();
+            Swal.fire('نجاح', 'تمت إضافة الموظف بنجاح', 'success');
+            renderAgencyDashboard();
+        }
+
+        function deleteEmployee(id) {
+            db.employees = db.employees.filter(e => e.id !== id);
+            saveDb();
+            renderAgencyDashboard();
+        }
+
+        function renderAgencyGeofenceTab(employees) {
+            return `
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <h3 class="text-xl font-bold text-slate-800 mb-2"><i class="fa-solid fa-map-location-dot text-indigo-600 ml-2"></i>تحديد إحداثيات ومسافة البصمة لكل موظف</h3>
+                    <p class="text-slate-500 text-sm mb-6">يستطيع الوكيل تحديد خط الطول والعرض والمسافة المسموحة (بالمتر) لكل موظف.</p>
+                    <div class="space-y-4">
+                        ${employees.map(e => `
+                            <div class="p-4 border rounded-2xl bg-slate-50 flex flex-col md:flex-row items-center justify-between gap-4">
+                                <div class="w-full md:w-1/4 flex items-center space-x-3 space-x-reverse">
+                                    <img src="${e.img || 'https://via.placeholder.com/40'}" class="w-10 h-10 rounded-full object-cover border">
+                                    <div>
+                                        <h4 class="font-bold text-slate-800">${e.name}</h4>
+                                        <p class="text-xs text-slate-500">النطاق الحالي: ${e.radius || 100} متر</p>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-3 gap-2 w-full md:w-1/2">
+                                    <input type="text" id="lat_${e.id}" value="${e.lat || 33.3152}" placeholder="خط العرض" class="p-2 border rounded-xl text-xs">
+                                    <input type="text" id="lng_${e.id}" value="${e.lng || 44.3661}" placeholder="خط الطول" class="p-2 border rounded-xl text-xs">
+                                    <input type="number" id="rad_${e.id}" value="${e.radius || 100}" placeholder="المسافة (متر)" class="p-2 border rounded-xl text-xs">
+                                </div>
+                                <div>
+                                    <button onclick="updateGeofence('${e.id}')" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition">حفظ الإحداثيات</button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateGeofence(id) {
+            const emp = db.employees.find(e => e.id === id);
+            if (emp) {
+                emp.lat = parseFloat(document.getElementById(`lat_${id}`).value);
+                emp.lng = parseFloat(document.getElementById(`lng_${id}`).value);
+                emp.radius = parseFloat(document.getElementById(`rad_${id}`).value);
+                saveDb();
+                Swal.fire('تم الحفظ', 'تم تحديث إحداثيات ومسافة البصمة بنجاح', 'success');
+            }
+        }
+
+        function renderAgencyTasksTab(employees, tasks) {
+            return `
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 lg:col-span-1">
+                        <h3 class="text-lg font-bold text-slate-800 mb-4"><i class="fa-solid fa-paper-plane text-indigo-600 ml-2"></i>إرسال مهمة جديدة للموظف (مع تفعيل الإشعار)</h3>
+                        <form onsubmit="handleAssignTask(event)" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-1 text-slate-700">اختر الموظف</label>
+                                <select id="task-emp" required class="w-full p-3 border rounded-xl text-sm">
+                                    ${employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1 text-slate-700">عنوان المهمة</label>
+                                <input type="text" id="task-title" required class="w-full p-3 border rounded-xl text-sm" placeholder="مثال: صيانة جهاز رئيسي">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1 text-slate-700">تفاصيل المهمة</label>
+                                <textarea id="task-desc" required class="w-full p-3 border rounded-xl text-sm" rows="3" placeholder="تفاصيل العمل المطلوبة..."></textarea>
+                            </div>
+                            <button type="submit" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow transition">إرسال المهمة وإشعار الموظف</button>
+                        </form>
+                    </div>
+
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 lg:col-span-2">
+                        <h3 class="text-lg font-bold text-slate-800 mb-4">متابعة المهام المنجزة والصرفيات والأموال</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-right border-collapse">
+                               <thead>
+                                    <tr class="bg-slate-100 text-slate-600 text-sm">
+                                        <th class="p-3 rounded-r-xl">الموظف</th>
+                                        <th class="p-3">المهمة</th>
+                                        <th class="p-3">الحالة</th>
+                                        <th class="p-3">الصرفيات / الأموال</th>
+                                        <th class="p-3 rounded-l-xl">تفاصيل الإنجاز</th>
+                                    </tr>
+                               </thead>
+                               <tbody class="divide-y divide-slate-100 text-sm">
+                                    ${tasks.length === 0 ? `<tr><td colspan="5" class="text-center p-6 text-slate-400">لا توجد مهام مرسلة</td></tr>` :
+                                      tasks.map(t => {
+                                        const emp = employees.find(e => e.id === t.employeeId);
+                                        return `
+                                            <tr>
+                                                <td class="p-3 font-bold text-slate-800">${emp ? emp.name : 'غير معروف'}</td>
+                                                <td class="p-3">${t.title}</td>
+                                                <td class="p-3"><span class="px-3 py-1 rounded-full text-xs font-semibold ${t.status === 'منجزة' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}">${t.status}</span></td>
+                                                <td class="p-3">${t.amount || 0} د.ع</td>
+                                                <td class="p-3 text-xs text-slate-600">${t.details || 'بانتظار الإنجاز...'}</td>
+                                            </tr>
+                                        `;
+                                      }).join('')}
+                               </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function handleAssignTask(e) {
+            e.preventDefault();
+            const newTask = {
+                id: 'task_' + Date.now(),
+                agencyId: currentUser.id,
+                employeeId: document.getElementById('task-emp').value,
+                title: document.getElementById('task-title').value,
+                desc: document.getElementById('task-desc').value,
+                status: 'قيد التنفيذ',
+                amount: 0,
+                details: '',
+                date: new Date().toLocaleDateString()
+            };
+            db.tasks.push(newTask);
+            saveDb();
+            Swal.fire('تم الإرسال', 'تم إرسال المهمة للموظف مع تفعيل الإشعار بنجاح!', 'success');
+            renderAgencyDashboard();
+        }
+
+        function renderAgencySalariesTab(employees, attendance) {
+            const currentDeductionRate = (db.settings && db.settings[currentUser.id] !== undefined) ? db.settings[currentUser.id] : 15000;
+            return `
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+                    <h3 class="text-xl font-bold text-slate-800 mb-2"><i class="fa-solid fa-sliders text-indigo-600 ml-2"></i>تحديد مبلغ الخصم المالي للتأخير</h3>
+                    <p class="text-slate-500 text-sm mb-4">حدد قيمة الخصم التي يتم استقطاعها تلقائياً من الراتب لكل مرة تأخير مسجلة للموظف.</p>
+                    <div class="flex items-center space-x-4 space-x-reverse max-w-md">
+                        <input type="number" id="agency-deduction-input" value="${currentDeductionRate}" class="p-3 border rounded-xl flex-1 text-sm" placeholder="مبلغ الخصم (د.ع)">
+                        <button onclick="updateDeductionRate()" class="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition">حفظ قيمة الخصم</button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <h3 class="text-xl font-bold text-slate-800 mb-2"><i class="fa-solid fa-calculator text-indigo-600 ml-2"></i>حساب الرواتب والخصومات التلقائية (حسب التأخير)</h3>
+                    <p class="text-slate-500 text-sm mb-6">يتم حساب الخصومات تلقائياً بناءً على القيمة المحددة أعلاه وأوقات الدوام الرسمية للموظف.</p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-600 text-sm">
+                                    <th class="p-3 rounded-r-xl">الموظف</th>
+                                    <th class="p-3">الراتب الأساسي</th>
+                                    <th class="p-3">أيام الحضور</th>
+                                    <th class="p-3">أيام التأخير</th>
+                                    <th class="p-3">إجمالي الخصم التلقائي</th>
+                                    <th class="p-3 rounded-l-xl font-bold text-indigo-600">الراتب الصافي المستحق</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-sm">
+                                ${employees.map(e => {
+                                    const empAtt = attendance.filter(a => a.employeeId === e.id);
+                                    const lateCount = empAtt.filter(a => a.status === 'متأخر').length;
+                                    const deduction = lateCount * currentDeductionRate;
+                                    const netSalary = Math.max(0, e.salary - deduction);
+                                    return `
+                                        <tr>
+                                            <td class="p-3 font-bold text-slate-800 flex items-center space-x-2 space-x-reverse">
+                                                <img src="${e.img || 'https://via.placeholder.com/30'}" class="w-8 h-8 rounded-full object-cover">
+                                                <span>${e.name}</span>
+                                            </td>
+                                            <td class="p-3">${e.salary} د.ع</td>
+                                            <td class="p-3">${empAtt.length} يوم</td>
+                                            <td class="p-3 text-rose-600 font-bold">${lateCount} مرة</td>
+                                            <td class="p-3 text-rose-600">${deduction} د.ع</td>
+                                            <td class="p-3 font-extrabold text-indigo-600">${netSalary} د.ع</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateDeductionRate() {
+            const val = parseFloat(document.getElementById('agency-deduction-input').value) || 0;
+            if(!db.settings) db.settings = {};
+            db.settings[currentUser.id] = val;
+            saveDb();
+            Swal.fire('تم الحفظ', 'تم تحديث قيمة الخصم التلقائي بنجاح وحفظها في النظام', 'success');
+            renderAgencyDashboard();
+        }
+
+        function renderAgencyReportsTab(tasks, attendance, employees) {
+            return `
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <h3 class="text-xl font-bold text-slate-800 mb-4"><i class="fa-solid fa-chart-pie text-indigo-600 ml-2"></i>التقارير الشاملة للمكتب</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="p-5 border rounded-2xl bg-slate-50">
+                            <h4 class="font-bold text-slate-700 mb-3">حالة المهام</h4>
+                            <p class="text-sm text-slate-600">إجمالي المهام المرسلة: <span class="font-bold text-indigo-600">${tasks.length}</span></p>
+                            <p class="text-sm text-slate-600 mt-2">المهام المنجزة: <span class="font-bold text-emerald-600">${tasks.filter(t => t.status === 'منجزة').length}</span></p>
+                        </div>
+                        <div class="p-5 border rounded-2xl bg-slate-50">
+                            <h4 class="font-bold text-slate-700 mb-3">سجل البصمات والحضور</h4>
+                            <p class="text-sm text-slate-600">إجمالي عمليات البصمة المسجلة: <span class="font-bold text-indigo-600">${attendance.length}</span></p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderEmployeeDashboard() {
+            const container = document.getElementById('main-content-area');
+            const emp = db.employees.find(e => e.id === currentUser.id);
+            const myTasks = db.tasks.filter(t => t.employeeId === currentUser.id);
+
+            container.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-gradient-to-br from-indigo-600 to-violet-700 text-white p-6 rounded-2xl shadow-lg flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="font-bold text-lg">بصمة الحضور الجغرافية</h3>
+                                <i class="fa-solid fa-fingerprint text-3xl opacity-80"></i>
+                            </div>
+                            <p class="text-xs text-indigo-100 mb-4">اضغط لتسجيل الحضور بناءً على موقعك الجغرافي ونطاق العمل المحدود.</p>
+                        </div>
+                        <button onclick="recordAttendance()" class="w-full py-3 bg-white text-indigo-700 font-bold rounded-xl shadow hover:bg-indigo-50 transition">تسجيل البصمة الآن</button>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 md:col-span-2">
+                        <h3 class="font-bold text-slate-800 text-lg mb-3"><i class="fa-solid fa-bell text-amber-500 ml-2"></i>الإشعارات والمهام الواردة</h3>
+                        <div class="space-y-3">
+                            ${myTasks.length === 0 ? `<p class="text-slate-400 text-sm">لا توجد مهام جديدة حالياً.</p>` :
+                              myTasks.map(t => `
+                                <div class="p-4 border rounded-xl bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                    <div>
+                                        <h4 class="font-bold text-slate-800">${t.title}</h4>
+                                        <p class="text-xs text-slate-600 mt-1">${t.desc}</p>
+                                        <span class="inline-block mt-2 px-2.5 py-0.5 rounded-full text-xs font-semibold ${t.status === 'منجزة' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}">${t.status}</span>
+                                    </div>
+                                    ${t.status !== 'منجزة' ? `
+                                        <button onclick="openCompleteTaskModal('${t.id}')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow transition">إنهاء المهمة مع التفاصيل</button>
+                                    ` : `<span class="text-xs font-bold text-emerald-600">تم الإنجاز بنجاح</span>`}
+                                </div>
+                              `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function recordAttendance() {
+            if (!navigator.geolocation) {
+                Swal.fire('خطأ', 'خاصية تحديد الموقع غير مدعومة في متصفحك', 'error');
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition((position) => {
+                const userLat = position.coords.latitude;
+                const userLng = position.coords.longitude;
+                const emp = db.employees.find(e => e.id === currentUser.id);
+
+                const distance = getDistanceFromLatLonInMeters(userLat, userLng, emp.lat, emp.lng);
+                const allowedRadius = emp.radius || 100;
+
+                if (distance > allowedRadius) {
+                    Swal.fire('خارج النطاق', `أنت بعيد عن موقع المكتب المسجل بمسافة ${Math.round(distance)} متر. الحد المسموح ${allowedRadius} متر.`, 'error');
+                    return;
+                }
+
+                const now = new Date();
+                const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+                const status = currentTime > emp.workStart ? 'متأخر' : 'حاضر';
+
+                db.attendance.push({
+                    id: 'att_' + Date.now(),
+                    employeeId: emp.id,
+                    agencyId: emp.agencyId,
+                    date: now.toLocaleDateString(),
+                    time: currentTime,
+                    status: status
+                });
+                saveDb();
+                Swal.fire('تم بنجاح', `تم تسجيل البصمة (${status}) بنجاح في الموقع المحدد`, 'success');
+            }, () => {
+                Swal.fire('خطأ', 'فشل في تحديد موقعك الجغرافي. تأكد من تفعيل الـ GPS.', 'error');
+            });
+        }
+
+        function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
+            const R = 6371000;
+            const dLat = (lat2 - lat1) * (Math.PI / 180);
+            const dLon = (lon2 - lon1) * (Math.PI / 180);
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        function openCompleteTaskModal(taskId) {
+            Swal.fire({
+                title: 'إنهاء المهمة وتقديم التفاصيل',
+                html: `
+                    <input id="swal-amount" type="number" class="swal2-input" placeholder="المبلغ أو الصرفيات (د.ع)">
+                    <textarea id="swal-details" class="swal2-textarea" placeholder="تفاصيل الإنجاز والصرفيات..."></textarea>
+                `,
+                confirmButtonText: 'إرسال للإدارة',
+                focusConfirm: false,
+                preConfirm: () => {
+                    return {
+                        amount: document.getElementById('swal-amount').value,
+                        details: document.getElementById('swal-details').value
+                    }
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const task = db.tasks.find(t => t.id === taskId);
+                    if (task) {
+                        task.status = 'منجزة';
+                        task.amount = parseFloat(result.value.amount) || 0;
+                        task.details = result.value.details;
+                        saveDb();
+                        Swal.fire('تم', 'تم إرسال تفاصيل إنجاز المهمة بنجاح', 'success');
+                        renderEmployeeDashboard();
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
